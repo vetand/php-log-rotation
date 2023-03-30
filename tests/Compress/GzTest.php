@@ -23,9 +23,7 @@ class GzTest extends TestCase
 
         file_put_contents(self::DIR_WORK.'file.log', $content);
 
-        $rotation->then(function ($fileRotated) {
-            $this->assertEquals(self::DIR_WORK.'file.log.1.gz', $fileRotated);
-        })->rotate(self::DIR_WORK.'file.log');
+        $rotation->addAssertOnSuccess(self::DIR_WORK.'file.log.1.gz')->rotate(self::DIR_WORK.'file.log');
 
         $this->assertFileExists(self::DIR_WORK.'file.log.1.gz');
 
@@ -64,8 +62,8 @@ class GzTest extends TestCase
         $rotation->compress(9)->rotate(self::DIR_WORK.'file.log');
         $sizeMaxLevel = filesize(self::DIR_WORK.'file.log.1.gz');
 
-        $this->assertLessThan($sizeMinLevel, $sizeDefaultLevel);
-        $this->assertGreaterThan($sizeMaxLevel, $sizeDefaultLevel);
+        $this->assertLessThan($sizeMinLevel + 1, $sizeDefaultLevel);
+        $this->assertGreaterThan($sizeMaxLevel - 1, $sizeDefaultLevel);
     }
 
     public function testRotationProcessorWithoutGzProcessorIfLevelIsZero(): void

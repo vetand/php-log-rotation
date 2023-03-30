@@ -9,9 +9,9 @@ class RotationFailed extends Exception
 {
     private string $filename;
 
-    public function __construct(string $message = '', int $code = 0, ?Throwable $previous = null, ?string $filename = null)
+    public function __construct(string $message = '', int $code = 0, ?string $filename = null)
     {
-        parent::__construct($message, $code, $previous);
+        parent::__construct($message, $code);
 
         $this->filename = $filename ?? '';
     }

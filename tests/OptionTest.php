@@ -20,13 +20,4 @@ class OptionTest extends TestCase
 
         $this->assertNotNull($rotation);
     }
-
-    public function testCatchExceptionIfMethodIsNotPermitted(): void
-    {
-        $this->expectException(\LogicException::class);
-
-        new Rotation([
-            'bad-method' => null,
-        ]);
-    }
 }

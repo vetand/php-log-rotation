@@ -55,18 +55,17 @@ class RotativeProcessorTest extends TestCase
         $tests = [
             [
                 'level' => 0,
+                'compress' => false,
                 'assert' => 'assertStringEndsNotWith',
             ],
             [
-                'level' => false,
-                'assert' => 'assertStringEndsNotWith',
-            ],
-            [
-                'level' => true,
+                'level' => 1,
+                'compress' => true,
                 'assert' => 'assertStringEndsWith',
             ],
             [
                 'level' => 5,
+                'compress' => true,
                 'assert' => 'assertStringEndsWith',
             ],
         ];
@@ -75,15 +74,19 @@ class RotativeProcessorTest extends TestCase
 
         foreach ($tests as $test) {
             $level = $test['level'];
+            $compress = $test['compress'];
             $assert = $test['assert'];
             file_put_contents(self::DIR_WORK.'file.log', microtime(true));
 
-            $rotation->compress($level)->then(function ($fileRotated) use ($assert) {
-                $this->{$assert}('gz', $fileRotated);
-            })->rotate(self::DIR_WORK.'file.log');
+            $rotation->compress($level)->rotate(self::DIR_WORK.'file.log');
+
+            if ($assert == 'assertStringEndsNotWith') {
+                $this->assertStringEndsNotWith('gz', $rotation->fileNameRotated());
+            } else if ($assert == 'assertStringEndsWith') {
+                $this->assertStringEndsWith('gz', $rotation->fileNameRotated());
+            } else {
+                $this->assertTrue(false);
+            }
         }
-
-
-
     }
 }

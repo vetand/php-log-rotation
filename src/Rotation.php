@@ -3,14 +3,23 @@
 namespace Cesargb\Log;
 
 use Cesargb\Log\Compress\Gz;
+use Cesargb\Log\Exceptions\RotationFailed;
 use Cesargb\Log\Processors\RotativeProcessor;
+
+use Closure;
 use Exception;
+use Throwable;
+
+include_once 'Compress/Gz.php';
+include_once 'Exceptions/RotationFailed.php';
+include_once 'Processors/RotativeProcessor.php';
+
+// https://github.com/php/php-src/blob/master/ext/standard/tests/file/flock.phpt
+const __LOCK_EX = 2;
+const __LOCK_UN = 3;
 
 class Rotation
 {
-    use Optionable;
-    use ErrorHandler;
-
     private const COMPRESS_DEFAULT_LEVEL = null;
 
     private RotativeProcessor $processor;
@@ -22,24 +31,68 @@ class Rotation
 
     private bool $_truncate = false;
 
+    private ?string $_assert_on_success = null;
+    private bool $_success = false;
+    private ?string $_filename_rotated = null;
+
+    private ?string $_filename = null;
+
     /**
      * @param mixed[] $options
      */
     public function __construct(array $options = [])
     {
         $this->processor = new RotativeProcessor();
+    }
 
-        $this->methodsOptionables([
-            'compress',
-            'truncate',
-            'minSize',
-            'files',
-            'then',
-            'catch',
-            'finally',
-        ]);
+    /**
+     * Function that will be executed when the rotation is successful.
+     * The first argument will be the name of the destination file
+     */
+    public function addAssertOnSuccess(string $expected): self
+    {
+        $this->_assert_on_success = $expected;
 
-        $this->options($options);
+        return $this;
+    }
+
+    protected function setFilename(string $filename): void
+    {
+        $this->_filename = $filename;
+    }
+
+    private function successful(string $filenameSource, ?string $filenameRotated): void
+    {
+        $this->_filename_rotated = $filenameRotated;
+
+        if (is_null($filenameRotated)) {
+            return;
+        }
+
+        if (!is_null($this->_assert_on_success)) {
+            if ($this->_assert_on_success != $filenameRotated) {
+                throw new Exception();
+            }
+        }
+
+        $this->_success = true;
+    }
+
+    protected function exception(Throwable $exception): self
+    {
+        $this->_success = false;
+
+        throw $this->convertException($exception);
+        return $this;
+    }
+
+    private function convertException(Throwable $exception): RotationFailed
+    {
+        return new RotationFailed(
+            $exception->getMessage(),
+            $exception->getCode(),
+            $this->_filename
+        );
     }
 
     /**
@@ -55,12 +108,14 @@ class Rotation
     /**
      * Old versions of log files are compressed.
      */
-    public function compress(bool|int $level = true): self
+    public function compress(?int $level = -1): self
     {
-        $this->_compress = (bool)($level);
-        $this->_compressLevel = is_numeric($level)
-            ? $level
-            : self::COMPRESS_DEFAULT_LEVEL;
+        $this->_compress = (bool)$level;
+        if ($level == -1) {
+            $this->_compressLevel = self::COMPRESS_DEFAULT_LEVEL;
+        } else {
+            $this->_compressLevel = $level;
+        }
 
         if ($this->_compress) {
             $this->processor->addExtension('gz');
@@ -169,8 +224,6 @@ class Rotation
     private function canRotate(string $filename): bool
     {
         if (!file_exists($filename)) {
-            $this->finished(sprintf('the file %s not exists.', $filename), $filename);
-
             return false;
         }
 
@@ -198,7 +251,7 @@ class Rotation
      */
     private function fileIsValid(string $filename): bool
     {
-        return is_file($filename) && is_writable($filename);
+        return is_file($filename);
     }
 
     /**
@@ -233,9 +286,10 @@ class Rotation
             return null;
         }
 
-        if (!ftruncate($fd, 0)) {
-            fclose($fd);
+        fclose($fd);
+        $fd = fopen($filename, "w");
 
+        if (!fopen($filename, "w")) {
             unlink($filenameTarget);
 
             $this->exception(
@@ -245,10 +299,7 @@ class Rotation
             return null;
         }
 
-        flock($fd, LOCK_UN);
-
         fflush($fd);
-
         fclose($fd);
 
         return $filenameTarget;
@@ -293,9 +344,6 @@ class Rotation
         return $filename;
     }
 
-    /**
-     * @return null|resource
-     */
     private function openFileWithLock(string $filename)
     {
         $fd = fopen($filename, 'r+');
@@ -308,16 +356,16 @@ class Rotation
             return null;
         }
 
-        if (!flock($fd, LOCK_EX)) {
-            fclose($fd);
-
-            $this->exception(
-                new Exception(sprintf('the file %s not can lock.', $filename), 21)
-            );
-
-            return null;
-        }
-
         return $fd;
+    }
+
+    public function isSuccessed(): bool
+    {
+        return $this->_success;
+    }
+
+    public function fileNameRotated(): ?string
+    {
+        return $this->_filename_rotated;
     }
 }

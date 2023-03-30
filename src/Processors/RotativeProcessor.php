@@ -2,6 +2,8 @@
 
 namespace Cesargb\Log\Processors;
 
+include_once 'AbstractProcessor.php';
+
 class RotativeProcessor extends AbstractProcessor
 {
     private int $maxFiles = 366;

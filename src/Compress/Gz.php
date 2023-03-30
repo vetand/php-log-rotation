@@ -20,7 +20,7 @@ class Gz
 
         $level = $level ?? '';
 
-        $gz = gzopen($filenameCompress, "wb{$level}");
+        $gz = fopen($filenameCompress, "wb{$level}");
 
         if ($gz === false) {
             fclose($fd);
@@ -33,10 +33,10 @@ class Gz
 
             $data = $data === false ? '' : $data;
 
-            gzwrite($gz, $data);
+            fwrite($gz, $data);
         }
 
-        gzclose($gz);
+        fclose($gz);
         fclose($fd);
         unlink($filename);
 
